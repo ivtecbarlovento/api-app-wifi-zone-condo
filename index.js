@@ -118,6 +118,18 @@ app.put("/clients/:id_number/status", async (req, res) => {
             [authStatus, username]
         );
 
+        if (status === 'Active') {
+            await pool.query(
+                "DELETE FROM radcheck WHERE username = $1 AND attribute = 'Session-Timeout'",
+                [username]
+            );
+        } else {
+            await pool.query(
+                "INSERT INTO radcheck (UserName, Attribute, op, Value) VALUES ($1, 'Session-Timeout', ':=', '300')",
+                [username]
+            );
+        }
+
         res.json(rows[0]);
     } catch (err) {
         console.error(err.message);
