@@ -130,7 +130,12 @@ app.put("/clients/:id_number/status", async (req, res) => {
 app.delete("/clients/:id_number", async (req, res) => {
     try {
         const { id_number } = req.params;
+        const { rows } = await pool.query("SELECT username FROM clients WHERE id_number = $1", [id_number]);
+        const username = rows[0].username;
+
         await pool.query("DELETE FROM clients WHERE id_number = $1", [id_number]);
+        await pool.query("DELETE FROM radcheck WHERE username = $1", [username]);
+
         res.json({ message: "Cliente eliminado" });
     } catch (err) {
         console.error(err.message);
