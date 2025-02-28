@@ -84,14 +84,22 @@ app.post("/clients", async (req, res) => {
 
 
 // Actualizar un cliente
-app.put("/clients/:id", async (req, res) => {
+app.put("/clients/:id_number", async (req, res) => {
     try {
-        const { id } = req.params;
-        const { name, last_name, id_number, status, id_zone, username, password } = req.body;
+        const { id_number } = req.params;
+        const { name, last_name, status, zone_name, username, password } = req.body;
         const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Obtener el id de la zona por nombre
+        const zoneResult = await pool.query("SELECT id FROM zone WHERE area = $1", [zone_name]);
+        if (zoneResult.rows.length === 0) {
+            return res.status(404).json({ message: "Area not found" });
+        }
+        const id_zone = zoneResult.rows[0].id;
+
         const { rows } = await pool.query(
-            "UPDATE clients SET name = $1, last_name = $2, id_number = $3, status = $4, id_zone = $5, username = $6, password = $7 WHERE id = $8 RETURNING *",
-            [name, last_name, id_number, status, id_zone, username, password, id]
+            "UPDATE clients SET name = $1, last_name = $2, status = $3, id_zone = $4, username = $5, password = $6 WHERE id_number = $7 RETURNING *",
+            [name, last_name, status, id_zone, username, password, id_number]
         );
         res.json(rows[0]);
     } catch (err) {
@@ -99,6 +107,7 @@ app.put("/clients/:id", async (req, res) => {
         res.status(500).send("Error del servidor");
     }
 });
+
 
 // Actualizar estado de un cliente
 app.put("/clients/:id_number/status", async (req, res) => {
