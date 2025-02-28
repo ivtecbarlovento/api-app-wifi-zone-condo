@@ -88,7 +88,7 @@ app.put("/clients/:id_number", async (req, res) => {
     try {
         const { id_number } = req.params;
         const { name, last_name, status, zone_name, username, password } = req.body;
-        const hashedPassword = await bcrypt.hash(password, 10);
+
 
         // Obtener el id de la zona por nombre
         const zoneResult = await pool.query("SELECT id FROM zone WHERE area = $1", [zone_name]);
