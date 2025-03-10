@@ -1,4 +1,4 @@
-require ('dotenv').config();
+require('dotenv').config();
 const express = require("express");
 const cors = require("cors");
 const pool = require("./db");
@@ -50,14 +50,14 @@ app.get("/clients/:id_number", async (req, res) => {
 // Crear un nuevo cliente
 app.post("/clients", async (req, res) => {
     try {
-        const { 
-            name, 
-            last_name, 
-            id_number, 
-            status, 
-            id_zone, 
-            username, 
-            password 
+        const {
+            name,
+            last_name,
+            id_number,
+            status,
+            id_zone,
+            username,
+            password
         } = req.body;
         const hashedPassword = await bcrypt.hash(password, 10);
         const { rows } = await pool.query(
@@ -186,6 +186,15 @@ app.post("/auth/login", async (req, res) => {
         res.status(500).send("Server error");
     }
 });
+
+// Sirve los archivos estáticos de la aplicación (como JS, CSS, etc.)
+app.use(express.static(path.join(__dirname, 'build')));
+
+// Redirige todas las solicitudes al archivo index.html
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
+
 
 // Iniciar el servidor
 app.listen(PORT, () => {
