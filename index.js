@@ -3,6 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const pool = require("./db");
 const bcrypt = require("bcrypt");
+const path = require('path');
 
 const app = express();
 const PORT = 5000;
