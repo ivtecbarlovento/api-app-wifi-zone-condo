@@ -256,18 +256,28 @@ app.post("/auth/login", async (req, res) => {
     }
 });
 
-// Get all users - with zone filtering
+// Get all users - with enhanced zone filtering
 app.get("/users", async (req, res) => {
     try {
-        const id_zone = req.query.id_zone || 1; // Default to 1 (all access) if not provided
+        const userZone = req.query.id_zone || 1; // Default to 1 (all access) if not provided
+        const userRole = req.query.role || 3; // Default to regular user role
         
         let query = "SELECT * FROM users";
         const params = [];
         
-        // If id_zone is not 1 (admin), filter by zone
-        if (id_zone != 1) {
+        // Admin in zone 1 can see all users
+        if (userZone == 1 && userRole == 1) {
+            // No additional filtering for global admin
+        } 
+        // Role 1 users from other zones can only see users from their zone
+        else if (userRole == 1 && userZone != 1) {
             query += " WHERE id_zone = $1";
-            params.push(id_zone);
+            params.push(userZone);
+        }
+        // Non-admin or non-role 1 users see only their zone users
+        else {
+            query += " WHERE id_zone = $1";
+            params.push(userZone);
         }
         
         const { rows } = await pool.query(query, params);
@@ -278,30 +288,14 @@ app.get("/users", async (req, res) => {
     }
 });
 
-// Get a user by ID
-app.get("/users/:id", async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { rows } = await pool.query("SELECT * FROM users WHERE id = $1", [id]);
-        
-        if (rows.length === 0) {
-            return res.status(404).json({ message: "User not found" });
-        }
-        
-        res.json(rows[0]);
-    } catch (err) {
-        console.error(err.message);
-        res.status(500).send("Error del servidor");
-    }
-});
-
-// Create a new user
+// Create a new user with enhanced authorization
 app.post("/users", async (req, res) => {
     try {
         const { username, password, role, zone } = req.body;
         
         // Get user's zone from request or session
         const userZone = req.query.id_zone || 1;
+        const userRole = req.query.role || 3;
         
         // Get zone ID based on zone name
         const zoneResult = await pool.query("SELECT id FROM zone WHERE area = $1", [zone]);
@@ -317,10 +311,22 @@ app.post("/users", async (req, res) => {
         }
         const id_role = roleResult.rows[0].id;
         
-        // Only allow zone 1 (admin) to create users in other zones
-        if (userZone != 1 && id_zone != userZone) {
+        // Global admin (zone 1, role 1) can create users anywhere
+        if (userZone === 1 && userRole === 1) {
+            // No restrictions
+        } 
+        // Role 1 users from other zones can only create users in their zone
+        else if (userRole === 1 && userZone !== 1) {
+            if (id_zone !== userZone) {
+                return res.status(403).json({ 
+                    message: "You can only create users in your own zone" 
+                });
+            }
+        }
+        // Other users cannot create users
+        else {
             return res.status(403).json({ 
-                message: "You can only create users in your own zone" 
+                message: "You do not have permission to create users" 
             });
         }
         
@@ -336,7 +342,7 @@ app.post("/users", async (req, res) => {
     }
 });
 
-// Update a user
+// Update a user with enhanced authorization
 app.put("/users/:id", async (req, res) => {
     try {
         const { id } = req.params;
@@ -344,6 +350,7 @@ app.put("/users/:id", async (req, res) => {
         
         // Get user's zone from request or session
         const userZone = req.query.id_zone || 1;
+        const userRole = req.query.role || 3;
         
         // Get zone ID based on zone name
         const zoneResult = await pool.query("SELECT id FROM zone WHERE area = $1", [zone]);
@@ -359,24 +366,35 @@ app.put("/users/:id", async (req, res) => {
         }
         const id_role = roleResult.rows[0].id;
         
-        // Check if the user exists
+        // Check if the user exists and retrieve current zone
         const userCheck = await pool.query("SELECT id_zone FROM users WHERE id = $1", [id]);
         
         if (userCheck.rows.length === 0) {
             return res.status(404).json({ message: "User not found" });
         }
         
-        // Only allow zone 1 (admin) to update users from other zones
-        if (userZone != 1 && userCheck.rows[0].id_zone != userZone) {
-            return res.status(403).json({ 
-                message: "You can only update users in your own zone" 
-            });
+        // Global admin (zone 1, role 1) can update any user
+        if (userZone === 1 && userRole === 1) {
+            // No restrictions
+        } 
+        // Role 1 users from other zones can only update users in their zone
+        else if (userRole === 1 && userZone !== 1) {
+            if (userCheck.rows[0].id_zone !== userZone) {
+                return res.status(403).json({ 
+                    message: "You can only update users in your own zone" 
+                });
+            }
+            // Prevent changing zone for non-global admins
+            if (id_zone !== userZone) {
+                return res.status(403).json({ 
+                    message: "You cannot assign users to other zones" 
+                });
+            }
         }
-        
-        // Only allow zone 1 (admin) to change users to other zones
-        if (userZone != 1 && id_zone != userZone) {
+        // Other users cannot update users
+        else {
             return res.status(403).json({ 
-                message: "You can only assign users to your own zone" 
+                message: "You do not have permission to update users" 
             });
         }
         
@@ -400,13 +418,14 @@ app.put("/users/:id", async (req, res) => {
     }
 });
 
-// Delete a user
+// Delete a user with enhanced authorization
 app.delete("/users/:id", async (req, res) => {
     try {
         const { id } = req.params;
         
         // Get user's zone from request or session
         const userZone = req.query.id_zone || 1;
+        const userRole = req.query.role || 3;
         
         // Check if the user exists
         const userCheck = await pool.query("SELECT id_zone FROM users WHERE id = $1", [id]);
@@ -415,10 +434,22 @@ app.delete("/users/:id", async (req, res) => {
             return res.status(404).json({ message: "User not found" });
         }
         
-        // Only allow zone 1 (admin) to delete users from other zones
-        if (userZone != 1 && userCheck.rows[0].id_zone != userZone) {
+        // Global admin (zone 1, role 1) can delete any user
+        if (userZone === 1 && userRole === 1) {
+            // No restrictions
+        } 
+        // Role 1 users from other zones can only delete users in their zone
+        else if (userRole === 1 && userZone !== 1) {
+            if (userCheck.rows[0].id_zone !== userZone) {
+                return res.status(403).json({ 
+                    message: "You can only delete users in your own zone" 
+                });
+            }
+        }
+        // Other users cannot delete users
+        else {
             return res.status(403).json({ 
-                message: "You can only delete users in your own zone" 
+                message: "You do not have permission to delete users" 
             });
         }
         
@@ -429,6 +460,7 @@ app.delete("/users/:id", async (req, res) => {
         res.status(500).send("Error del servidor");
     }
 });
+
 
 // // Sirve los archivos estáticos de la aplicación (como JS, CSS, etc.)
 // app.use(express.static(path.join(__dirname, 'dist')));
