@@ -431,6 +431,107 @@ app.delete("/users/:id", async (req, res) => {
 });
 
 
+// Get all devices
+app.get("/devices", async (req, res) => {
+    try {
+        const { rows } = await pool.query("SELECT * FROM nas");
+        res.json(rows);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send("Error del servidor");
+    }
+});
+
+// Create a new device
+app.post("/devices", async (req, res) => {
+    try {
+        const {
+            nasname,
+            shortname,
+            type,
+            nasipaddress,
+            secret,
+            server = null
+        } = req.body;
+        
+        // Get user's zone from token or request (you'll need to modify your auth middleware)
+        const userZone = req.user?.id_zone || 1;
+        
+        // Optional: Add zone-based restrictions if needed
+        // if (userZone !== 1 && someZoneCondition) {
+        //     return res.status(403).json({ 
+        //         message: "You can only create devices in your allowed zones" 
+        //     });
+        // }
+        
+        const { rows } = await pool.query(
+            "INSERT INTO nas (nasname, shortname, type, nasipaddress, secret, server) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+            [nasname, shortname, type, nasipaddress, secret, server]
+        );
+
+        res.json(rows[0]);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send("Error del servidor");
+    }
+});
+
+// Update a device
+app.put("/devices/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+        const {
+            nasname,
+            shortname,
+            type,
+            nasipaddress,
+            secret,
+            server
+        } = req.body;
+        
+        // Get user's zone from token or request
+        const userZone = req.user?.id_zone || 1;
+        
+        // Optional: Add zone-based restrictions
+        
+        const { rows } = await pool.query(
+            "UPDATE nas SET nasname = $1, shortname = $2, type = $3, nasipaddress = $4, secret = $5, server = $6 WHERE id = $7 RETURNING *",
+            [nasname, shortname, type, nasipaddress, secret, server, id]
+        );
+
+        if (rows.length === 0) {
+            return res.status(404).json({ message: "Device not found" });
+        }
+
+        res.json(rows[0]);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send("Error del servidor");
+    }
+});
+
+// Delete a device
+app.delete("/devices/:id", async (req, res) => {
+    try {
+        const { id } = req.params;
+        
+        // Get user's zone from token or request
+        const userZone = req.user?.id_zone || 1;
+        
+        // Optional: Add zone-based restrictions
+        
+        const result = await pool.query("DELETE FROM nas WHERE id = $1", [id]);
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ message: "Device not found" });
+        }
+
+        res.json({ message: "Device deleted successfully" });
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send("Error del servidor");
+    }
+});
 
 // // Sirve los archivos estáticos de la aplicación (como JS, CSS, etc.)
 // app.use(express.static(path.join(__dirname, 'dist')));
