@@ -465,8 +465,8 @@ app.post("/devices", async (req, res) => {
         // }
         
         const { rows } = await pool.query(
-            "INSERT INTO nas (nasname, shortname, type, nasipaddress, secret, server) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
-            [nasname, shortname, type, nasipaddress, secret, server]
+            "INSERT INTO nas (nasname, shortname, type, secret) VALUES ($1, $2, $3, $4) RETURNING *",
+            [nasname, shortname, type, secret]
         );
 
         res.json(rows[0]);
@@ -495,7 +495,7 @@ app.put("/devices/:id", async (req, res) => {
         // Optional: Add zone-based restrictions
         
         const { rows } = await pool.query(
-            "UPDATE nas SET nasname = $1, shortname = $2, type = $3, nasipaddress = $4, secret = $5, server = $6 WHERE id = $7 RETURNING *",
+            "UPDATE nas SET nasname = $1, shortname = $2, type = $3, secret = $4 WHERE id = $7 RETURNING *",
             [nasname, shortname, type, nasipaddress, secret, server, id]
         );
 
@@ -532,6 +532,8 @@ app.delete("/devices/:id", async (req, res) => {
         res.status(500).send("Error del servidor");
     }
 });
+
+
 
 // // Sirve los archivos estáticos de la aplicación (como JS, CSS, etc.)
 // app.use(express.static(path.join(__dirname, 'dist')));
